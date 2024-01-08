@@ -13,6 +13,7 @@ Tested on Powershell 7 @ Windows 11
 - You only need to download the bat file!
 - On first run the File downloads the Script automatically.
 - If you run the Script via Autostart, you need to Accept the Window that gives Powershell the Permission to run.
+- The Bat File ONLY runs the voicemeter Version! If you only need it for audiodg, use the .ps1 version for Audiodg!
 
 ## If Powershell tells you you have no permission:
 - Set Group RemoteSigned or Unrestricted
@@ -21,8 +22,6 @@ Set-ExecutionPolicy -ExecutionPolicy #### -force
 ```
 - Instead of #### use RemoteSigned or Unrestricted
 - The Script should work.
-
-
 
 
 
