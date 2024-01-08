@@ -1,18 +1,3 @@
-# Überprüfe Administratorrechte
-$isElevated = ([Security.Principal.WindowsIdentity]::GetCurrent()).groups -match "S-1-5-32-544"
-if (-not $isElevated) {
-    Write-Host "Das Skript erfordert Administratorrechte. Starte das Skript erneut als Administrator."
-
-    # Pfad zur PowerShell-Exe-Datei
-    $powershellExePath = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
-
-    # Starte das Skript erneut mit Administratorrechten
-    Start-Process -FilePath $powershellExePath -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
-
-    # Beende das aktuelle nicht erhöhte Skript
-    exit
-}
-
 # Funktion zum Überprüfen, ob ein Prozess läuft
 function Test-ProcessRunning($processName) {
     return Get-Process -name $processName -ErrorAction SilentlyContinue
