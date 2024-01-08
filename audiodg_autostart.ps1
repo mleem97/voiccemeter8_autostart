@@ -13,6 +13,17 @@ if (-not $isElevated) {
     exit
 }
 
+function start-countdown {
+  param (
+      $sleepintervalsec
+   )
+
+   foreach ($step in (1..$sleepintervalsec)) {
+      write-progress -Activity "All Settings Applied" -Status "Press any key to exit" -SecondsRemaining ($sleepintervalsec-$step) -PercentComplete  ($step/$sleepintervalsec*100)
+      start-sleep -seconds 1
+   }
+}
+
 # Funktion zum Überprüfen, ob ein Prozess läuft
 function Test-ProcessRunning($processName) {
     return Get-Process -name $processName -ErrorAction SilentlyContinue
@@ -24,10 +35,13 @@ $audioProcess = Get-Process -Name Audiodg
 if ($audioProcess) {
     $audioProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High
     $audioProcess.ProcessorAffinity = 1
-    Write-Host "Einstellungen für Audiodg.exe erfolgreich angewendet."
+    start-countdown 10
 } else {
     Write-Host "Der Prozess 'Audiodg.exe' wurde nicht gefunden."
 }
+
+
+
 
 # Rückgabewert 0 für Erfolg
 return 0
