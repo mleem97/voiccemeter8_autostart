@@ -1,3 +1,18 @@
+# Überprüfe Administratorrechte
+$isElevated = ([Security.Principal.WindowsIdentity]::GetCurrent()).groups -match "S-1-5-32-544"
+if (-not $isElevated) {
+    Write-Host "Das Skript erfordert Administratorrechte. Starte das Skript erneut als Administrator."
+
+    # Pfad zur PowerShell-Exe-Datei
+    $powershellExePath = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+    # Starte das Skript erneut mit Administratorrechten
+    Start-Process -FilePath $powershellExePath -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
+
+    # Beende das aktuelle nicht erhöhte Skript
+    exit
+}
+
 # Funktion zum Überprüfen, ob ein Prozess läuft
 function Test-ProcessRunning($processName) {
     return Get-Process -name $processName -ErrorAction SilentlyContinue
@@ -14,20 +29,6 @@ if ($audioProcess) {
     Write-Host "Der Prozess 'Audiodg.exe' wurde nicht gefunden."
 }
 
-# Überprüfe, ob "voicemeeter8x64.exe" läuft
-$voicemeeterProcessName = "voicemeeter8x64.exe"
-$voicemeeterProcess = Test-ProcessRunning $voicemeeterProcessName
-
-if ($voicemeeterProcess) {
-    # Setze die Priorität und Affinität für "voicemeeter8x64.exe"
-    $voicemeeterProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High
-    $voicemeeterProcess.ProcessorAffinity = 1
-    Write-Host "Einstellungen für $voicemeeterProcessName erfolgreich angewendet."
-} else {
-    # Starte "voicemeeter8x64.exe", falls nicht gestartet
-    Start-Process -FilePath "C:\Program Files (x86)\VB\Voicemeeter\voicemeeter8x64.exe"
-    Write-Host "$voicemeeterProcessName wurde gestartet."
-}
-
 # Rückgabewert 0 für Erfolg
 return 0
+
