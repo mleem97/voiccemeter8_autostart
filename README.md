@@ -36,7 +36,7 @@ RemoteSigned
 ```
 or 
 ```powershell 
-Unrestricted.
+Unrestricted
 ```
 2. Try running the script again. It should now work as intended.
 
