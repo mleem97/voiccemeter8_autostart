@@ -1,48 +1,119 @@
-# Überprüfe Administratorrechte
-$isElevated = ([Security.Principal.WindowsIdentity]::GetCurrent()).groups -match "S-1-5-32-544"
+#requires -version 3
+
+<#
+.SYNOPSIS
+  Skript zur Überprüfung von Adminrechten, Setzen von Prozesspriorität und CPU-Affinität für Audiodg.exe.
+
+.DESCRIPTION
+  - Prüft zuerst, ob das Skript mit erhöhten Rechten läuft.
+  - Wenn nicht, wird das Skript automatisch mit Administratorrechten neu gestartet.
+  - Zeigt einen Countdown-Fortschrittsbalken an.
+  - Setzt die Prozesspriorität und CPU-Affinität für Audiodg.exe (falls erlaubt).
+  - Fängt mögliche Fehler in try/catch ab.
+  - Optional: wartet nach dem Countdown auf einen Tastendruck.
+
+.NOTES
+  Bei Audiodg.exe kann es sein, dass die Prioritäts- oder Affinitätsänderung blockiert wird, weil dieser Prozess
+  auf manchen Windows-Versionen als "Protected Process Light" läuft. In dem Fall ist auch als Admin "Zugriff verweigert" möglich.
+
+#>
+
+# ---------------------------------------------
+# 1) Überprüfung Administratorrechte
+# ---------------------------------------------
+Write-Verbose "Prüfe Administratorrechte..."
+$isElevated = ([Security.Principal.WindowsIdentity]::GetCurrent()).Groups -match "S-1-5-32-544"
 if (-not $isElevated) {
-    Write-Host "Das Skript erfordert Administratorrechte. Starte das Skript erneut als Administrator."
+    Write-Host "Das Skript erfordert Administratorrechte. Es wird neu als Administrator gestartet..."
 
-    # Pfad zur PowerShell-Exe-Datei
     $powershellExePath = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
-
-    # Starte das Skript erneut mit Administratorrechten
     Start-Process -FilePath $powershellExePath -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`"" -Verb RunAs
-
-    # Beende das aktuelle nicht erhöhte Skript
+    
+    # Das aktuelle Skript beenden, da es nicht erhöht ist
     exit
 }
 
-function start-countdown {
-  param (
-      $sleepintervalsec
-   )
+Write-Host "Skript wird mit Administratorrechten ausgeführt..."
 
-   foreach ($step in (1..$sleepintervalsec)) {
-      write-progress -Activity "All Settings Applied" -Status "Press any key to exit" -SecondsRemaining ($sleepintervalsec-$step) -PercentComplete  ($step/$sleepintervalsec*100)
-      start-sleep -seconds 1
-   }
+# ---------------------------------------------
+# 2) Funktion: Countdown anzeigen
+# ---------------------------------------------
+function Start-Countdown {
+    param(
+        [Parameter(Mandatory=$true)]
+        [int]
+        $SleepIntervalSec
+    )
+
+    Write-Host "Starte Countdown für $SleepIntervalSec Sekunden..."
+
+    foreach ($step in 1..$SleepIntervalSec) {
+        Write-Progress `
+            -Activity "All Settings Applied" `
+            -Status "Countdown läuft..." `
+            -SecondsRemaining ($SleepIntervalSec - $step) `
+            -PercentComplete ($step / $SleepIntervalSec * 100)
+
+        Start-Sleep -Seconds 1
+    }
+    # Optional: Warten auf Tastendruck
+    # Hier auskommentiert lassen, falls nicht gewünscht:
+    # Write-Host "Drücke eine beliebige Taste, um fortzufahren..."
+    # [System.Console]::ReadKey() | Out-Null
 }
 
-# Funktion zum Überprüfen, ob ein Prozess läuft
-function Test-ProcessRunning($processName) {
-    return Get-Process -name $processName -ErrorAction SilentlyContinue
+# ---------------------------------------------
+# 3) Funktion: Prozess-Check
+#    (Wird im Beispiel unten nicht zwingend genutzt,
+#     kann aber als Hilfsfunktion dienen)
+# ---------------------------------------------
+function Test-ProcessRunning {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]
+        $ProcessName
+    )
+    # Gibt TRUE zurück, wenn Prozess existiert, sonst FALSE
+    $proc = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue
+    return $proc -ne $null
 }
 
-# Setze die Priorität und Affinität für "Audiodg.exe"
-$audioProcess = Get-Process -Name Audiodg
+# ---------------------------------------------
+# 4) Setze die Priorität und Affinität für Audiodg.exe
+# ---------------------------------------------
+Write-Host "`nVersuche, Audiodg.exe zu finden..."
+$audioProcess = Get-Process -Name Audiodg -ErrorAction SilentlyContinue
 
 if ($audioProcess) {
-    $audioProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High
-    $audioProcess.ProcessorAffinity = 1
-    start-countdown 10
+    # Falls mehrere Instanzen zurückkommen, nur den ersten nehmen
+    if ($audioProcess.Count -gt 1) {
+        Write-Host "Mehrere Instanzen von Audiodg.exe gefunden, verwende nur die erste."
+        $audioProcess = $audioProcess[0]
+    }
+
+    try {
+        Write-Host "Setze Prozesspriorität auf 'High'..."
+        $audioProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::High
+
+        Write-Host "Setze CPU-Affinität auf nur CPU0..."
+        # Wir geben explizit einen IntPtr an
+        $audioProcess.ProcessorAffinity = [System.IntPtr]1
+
+        Write-Host "Priorität und Affinität wurden (sofern erlaubt) erfolgreich gesetzt."
+    }
+    catch {
+        Write-Warning "Fehler beim Setzen der Priorität oder Affinität: $($_.Exception.Message)"
+    }
+
+    # Countdown anzeigen
+    Start-Countdown -SleepIntervalSec 10
+
 } else {
-    Write-Host "Der Prozess 'Audiodg.exe' wurde nicht gefunden."
+    Write-Host "Der Prozess 'Audiodg.exe' wurde nicht gefunden oder läuft derzeit nicht."
 }
 
-
-
-
-# Rückgabewert 0 für Erfolg
+# ---------------------------------------------
+# 5) Skript-Ende, Exit-Code 0 für Erfolg
+# ---------------------------------------------
+Write-Host "`nSkript fertig. Exit-Code = 0"
 return 0
-
