@@ -4,6 +4,12 @@ A PowerShell script to set the priority of **Audiodg.exe** and/or **Voicemeeter8
 
 **Tested on:** Windows 11 (PowerShell)
 
+## NOTES:
+ It may happen that changing the priority or affinity of Audiodg.exe is blocked because, on some versions of Windows, this process runs as a "Protected Process Light." 
+ In that case, "Access denied" is possible even for an administrator.
+
+
+
 ---
 
 ## How to Use
