@@ -1,27 +1,44 @@
-# Voicemeter / Audiodg - Set Affinity 
-Powershell Script to set priority of process "Audiodg" and/or "Voicemeter8x64" to High and set it to run on a single core.
+# Voicemeeter / Audiodg – Set Affinity
 
-Tested on Powershell @ Windows 11
+A PowerShell script to set the priority of **Audiodg.exe** and/or **Voicemeeter8x64.exe** to **High** and pin them to a single CPU core.
 
-## How to Use?
+**Tested on:** Windows 11 (PowerShell)
 
-- Download bat file from releases.
-- Press Win + R and enter shell:startup
-- Place Bat file into the folder that opens.
+---
 
-## IMPORTANT!
-- You only need to download the bat file!
-- On first run the File downloads the Script automatically.
-- If you run the Script via Autostart, you need to Accept the Window that gives Powershell the Permission to run.
-- The Bat File ONLY runs the voicemeter Version! If you only need it for audiodg, use the .ps1 version for Audiodg!
+## How to Use
 
-## If Powershell tells you you have no permission:
-- Set Group RemoteSigned or Unrestricted
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy #### -force
+1. **Download the `.bat` file** from the [Releases].
+2. Press **Win + R**, type `shell:startup`, and press **Enter**.
+3. Copy the downloaded `.bat` file into the **Startup** folder that opens.
+
+---
+
+## Important Notes
+
+- You **only need** to download the `.bat` file!
+- On the **first run**, the `.bat` file automatically downloads the corresponding PowerShell script.
+- If you run the script via **Autostart**, you must accept the PowerShell permission prompt (UAC) to allow it to run with the required privileges.
+- The `.bat` file is set up to handle **Voicemeeter**. If you **only** need to adjust **Audiodg**, please use the `.ps1` script for Audiodg directly.
+
+---
+
+## If PowerShell Denies Permission
+
+1. Change your PowerShell **Execution Policy** to either `RemoteSigned` or `Unrestricted`:
+   
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy #### -Force
+   ```
+Replace #### with 
+```powershell 
+RemoteSigned 
 ```
-- Instead of #### use RemoteSigned or Unrestricted
-- The Script should work.
+or 
+```powershell 
+Unrestricted.
+```
+2. Try running the script again. It should now work as intended.
 
 
-
+Feel free to reach out if you encounter any issues or have questions!
