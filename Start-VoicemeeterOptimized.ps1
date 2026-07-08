@@ -27,9 +27,13 @@
     .\Start-VoicemeeterOptimized.ps1
     Runs the script with automatic elevation if needed.
 
+.EXAMPLE
+    .\Start-VoicemeeterOptimized.ps1 -WhatIf
+    Shows which process changes would be attempted without applying them.
+
 #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess = $true)]
 param()
 
 # Load Windows Forms for GUI notifications
@@ -59,6 +63,23 @@ $Script:Results = @{
     VoicemeeterPriority = $false
     VoicemeeterAffinity = $false
     Errors              = @()
+}
+
+# ---------------------------------------------
+# Function: Write-StatusMessage
+# ---------------------------------------------
+function Write-StatusMessage {
+    <#
+    .SYNOPSIS
+        Writes status text to the verbose stream.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    Write-Verbose -Message $Message
 }
 
 # ---------------------------------------------
@@ -93,13 +114,7 @@ function Show-Notification {
     }
 
     if (-not $NoConsole) {
-        $color = switch ($Type) {
-            'Information' { 'Cyan' }
-            'Warning'     { 'Yellow' }
-            'Error'       { 'Red' }
-            'Question'    { 'White' }
-        }
-        Write-Host "[$Type] $Message" -ForegroundColor $color
+        Write-StatusMessage -Message "[$Type] $Message"
     }
 
     [System.Windows.Forms.MessageBox]::Show(
@@ -141,11 +156,11 @@ function Start-ElevatedProcess {
     .SYNOPSIS
         Restarts the current script with elevated privileges.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
     param()
 
     try {
-        Write-Host "Administrator privileges required. Restarting with elevation..." -ForegroundColor Yellow
+        Write-StatusMessage -Message "Administrator privileges required. Restarting with elevation..."
         
         $pwshPath = if (Test-Path "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe") {
             "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -153,14 +168,21 @@ function Start-ElevatedProcess {
             "powershell.exe"
         }
 
+        $scriptPath = $MyInvocation.PSCommandPath
+        if (-not $scriptPath) {
+            $scriptPath = $PSCommandPath
+        }
+
         $arguments = @(
             '-NoProfile'
             '-ExecutionPolicy', 'Bypass'
-            '-File', "`"$($MyInvocation.PSCommandPath)`""
+            '-File', "`"$scriptPath`""
         )
 
-        Start-Process -FilePath $pwshPath -ArgumentList $arguments -Verb RunAs
-        exit 0
+        if ($PSCmdlet.ShouldProcess($scriptPath, 'Restart script with administrator privileges')) {
+            Start-Process -FilePath $pwshPath -ArgumentList $arguments -Verb RunAs -ErrorAction Stop
+            exit 0
+        }
     }
     catch {
         Show-Notification -Message "Failed to elevate privileges: $($_.Exception.Message)" -Type Error
@@ -219,7 +241,7 @@ function Set-ProcessPriority {
     .SYNOPSIS
         Sets the priority class for a given process.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
         [Parameter(Mandatory = $true)]
         [System.Diagnostics.Process]$Process,
@@ -233,8 +255,13 @@ function Set-ProcessPriority {
 
     try {
         Write-Verbose "Setting $ProcessDisplayName priority to '$Priority'"
+
+        if (-not $PSCmdlet.ShouldProcess($ProcessDisplayName, "Set process priority to '$Priority'")) {
+            return $false
+        }
+
         $Process.PriorityClass = $Priority
-        Write-Host "✓ $ProcessDisplayName priority set to '$Priority'" -ForegroundColor Green
+        Write-StatusMessage -Message "$ProcessDisplayName priority set to '$Priority'"
         return $true
     }
     catch [System.ComponentModel.Win32Exception] {
@@ -259,7 +286,7 @@ function Set-ProcessorAffinity {
     .SYNOPSIS
         Sets the processor affinity for a given process.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
         [Parameter(Mandatory = $true)]
         [System.Diagnostics.Process]$Process,
@@ -273,8 +300,13 @@ function Set-ProcessorAffinity {
 
     try {
         Write-Verbose "Setting $ProcessDisplayName processor affinity to CPU Core 0"
+
+        if (-not $PSCmdlet.ShouldProcess($ProcessDisplayName, "Set processor affinity to '$Affinity'")) {
+            return $false
+        }
+
         $Process.ProcessorAffinity = $Affinity
-        Write-Host "✓ $ProcessDisplayName processor affinity set to CPU Core 0" -ForegroundColor Green
+        Write-StatusMessage -Message "$ProcessDisplayName processor affinity set to CPU Core 0"
         return $true
     }
     catch [System.ComponentModel.Win32Exception] {
@@ -302,19 +334,19 @@ function Optimize-AudiodgProcess {
     [CmdletBinding()]
     param()
 
-    Write-Host "`n--- Configuring audiodg.exe ---" -ForegroundColor Cyan
+    Write-StatusMessage -Message "Configuring audiodg.exe"
     
     try {
         $audioProcess = Get-ProcessWithRetry -ProcessName $Script:Config.AudiodgProcessName -MaxRetries $Script:Config.MaxRetryAttempts -RetryDelaySeconds $Script:Config.RetryDelaySeconds
 
         if (-not $audioProcess) {
-            Write-Host "⚠ audiodg.exe process not found" -ForegroundColor Yellow
+            Write-StatusMessage -Message "audiodg.exe process not found"
             Show-Notification -Message "audiodg.exe was not found or is not currently running." -Type Information -NoConsole
             return
         }
 
         $Script:Results.AudiodgFound = $true
-        Write-Host "✓ Found audiodg.exe (PID: $($audioProcess.Id))" -ForegroundColor Green
+        Write-StatusMessage -Message "Found audiodg.exe (PID: $($audioProcess.Id))"
 
         # Set priority
         $Script:Results.AudiodgPriority = Set-ProcessPriority -Process $audioProcess -Priority $Script:Config.TargetPriority -ProcessDisplayName 'audiodg.exe'
@@ -342,17 +374,17 @@ function Start-VoicemeeterApplication {
     .SYNOPSIS
         Starts the Voicemeeter application if not running.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param()
 
-    Write-Host "`n--- Configuring Voicemeeter ---" -ForegroundColor Cyan
+    Write-StatusMessage -Message "Configuring Voicemeeter"
 
     # Check if Voicemeeter is already running
     $voicemeeterProcess = Get-ProcessWithRetry -ProcessName $Script:Config.VoicemeeterProcessName -MaxRetries 1 -RetryDelaySeconds 1
 
     if ($voicemeeterProcess) {
         $Script:Results.VoicemeeterFound = $true
-        Write-Host "✓ Voicemeeter is already running (PID: $($voicemeeterProcess.Id))" -ForegroundColor Green
+        Write-StatusMessage -Message "Voicemeeter is already running (PID: $($voicemeeterProcess.Id))"
         return $voicemeeterProcess
     }
 
@@ -367,10 +399,15 @@ function Start-VoicemeeterApplication {
 
     # Start Voicemeeter
     try {
-        Write-Host "Starting Voicemeeter..." -ForegroundColor Yellow
+        Write-StatusMessage -Message "Starting Voicemeeter..."
+
+        if (-not $PSCmdlet.ShouldProcess($Script:Config.VoicemeeterExecutable, 'Start Voicemeeter')) {
+            return $null
+        }
+
         Start-Process -FilePath $Script:Config.VoicemeeterExecutable -ErrorAction Stop
         
-        Write-Host "Waiting $($Script:Config.VoicemeeterStartupDelay) seconds for Voicemeeter to initialize..." -ForegroundColor Yellow
+        Write-StatusMessage -Message "Waiting $($Script:Config.VoicemeeterStartupDelay) seconds for Voicemeeter to initialize..."
         Start-Sleep -Seconds $Script:Config.VoicemeeterStartupDelay
 
         # Verify it started
@@ -378,7 +415,7 @@ function Start-VoicemeeterApplication {
 
         if ($voicemeeterProcess) {
             $Script:Results.VoicemeeterStarted = $true
-            Write-Host "✓ Voicemeeter started successfully (PID: $($voicemeeterProcess.Id))" -ForegroundColor Green
+            Write-StatusMessage -Message "Voicemeeter started successfully (PID: $($voicemeeterProcess.Id))"
             Show-Notification -Message "Voicemeeter has been started successfully." -Type Information -NoConsole
             return $voicemeeterProcess
         }
@@ -413,7 +450,7 @@ function Optimize-VoicemeeterProcess {
     )
 
     if (-not $Process) {
-        Write-Host "⚠ Voicemeeter process not available for optimization" -ForegroundColor Yellow
+        Write-StatusMessage -Message "Voicemeeter process not available for optimization"
         return
     }
 
@@ -447,40 +484,38 @@ function Show-FinalSummary {
     [CmdletBinding()]
     param()
 
-    Write-Host "`n╔════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║         Operation Summary              ║" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-StatusMessage -Message "Operation Summary"
 
     # Audiodg summary
-    Write-Host "`nAudiodg.exe:" -ForegroundColor Yellow
-    Write-Host "  Found:    $(if ($Script:Results.AudiodgFound) { '✓' } else { '✗' })" -ForegroundColor $(if ($Script:Results.AudiodgFound) { 'Green' } else { 'Red' })
+    Write-StatusMessage -Message "Audiodg.exe:"
+    Write-StatusMessage -Message "  Found:    $(if ($Script:Results.AudiodgFound) { 'Yes' } else { 'No' })"
     if ($Script:Results.AudiodgFound) {
-        Write-Host "  Priority: $(if ($Script:Results.AudiodgPriority) { '✓' } else { '✗' })" -ForegroundColor $(if ($Script:Results.AudiodgPriority) { 'Green' } else { 'Yellow' })
-        Write-Host "  Affinity: $(if ($Script:Results.AudiodgAffinity) { '✓' } else { '✗' })" -ForegroundColor $(if ($Script:Results.AudiodgAffinity) { 'Green' } else { 'Yellow' })
+        Write-StatusMessage -Message "  Priority: $(if ($Script:Results.AudiodgPriority) { 'Applied' } else { 'Not applied' })"
+        Write-StatusMessage -Message "  Affinity: $(if ($Script:Results.AudiodgAffinity) { 'Applied' } else { 'Not applied' })"
     }
 
     # Voicemeeter summary
-    Write-Host "`nVoicemeeter:" -ForegroundColor Yellow
+    Write-StatusMessage -Message "Voicemeeter:"
     if ($Script:Results.VoicemeeterStarted) {
-        Write-Host "  Started:  ✓" -ForegroundColor Green
+        Write-StatusMessage -Message "  Started:  Yes"
     }
     elseif ($Script:Results.VoicemeeterFound) {
-        Write-Host "  Running:  ✓" -ForegroundColor Green
+        Write-StatusMessage -Message "  Running:  Yes"
     }
     else {
-        Write-Host "  Status:   ✗" -ForegroundColor Red
+        Write-StatusMessage -Message "  Status:   Not found"
     }
 
     if ($Script:Results.VoicemeeterFound -or $Script:Results.VoicemeeterStarted) {
-        Write-Host "  Priority: $(if ($Script:Results.VoicemeeterPriority) { '✓' } else { '✗' })" -ForegroundColor $(if ($Script:Results.VoicemeeterPriority) { 'Green' } else { 'Yellow' })
-        Write-Host "  Affinity: $(if ($Script:Results.VoicemeeterAffinity) { '✓' } else { '✗' })" -ForegroundColor $(if ($Script:Results.VoicemeeterAffinity) { 'Green' } else { 'Yellow' })
+        Write-StatusMessage -Message "  Priority: $(if ($Script:Results.VoicemeeterPriority) { 'Applied' } else { 'Not applied' })"
+        Write-StatusMessage -Message "  Affinity: $(if ($Script:Results.VoicemeeterAffinity) { 'Applied' } else { 'Not applied' })"
     }
 
     # Errors
     if ($Script:Results.Errors.Count -gt 0) {
-        Write-Host "`nWarnings/Errors:" -ForegroundColor Red
-        foreach ($error in $Script:Results.Errors) {
-            Write-Host "  • $error" -ForegroundColor Yellow
+        Write-StatusMessage -Message "Warnings/Errors:"
+        foreach ($errorMessage in $Script:Results.Errors) {
+            Write-StatusMessage -Message "  - $errorMessage"
         }
     }
 
@@ -502,23 +537,23 @@ function Show-FinalSummary {
 
     # Final message
     $finalMessage = if ($totalOperations -eq 0) {
-        "⚠ No processes were found or configured."
+        "No processes were found or configured."
     }
     elseif ($successfulOperations -eq $totalOperations) {
-        "✓ All operations completed successfully! ($successfulOperations/$totalOperations)"
+        "All operations completed successfully. ($successfulOperations/$totalOperations)"
     }
     else {
-        "⚠ Partial success: $successfulOperations of $totalOperations operations completed."
+        "Partial success: $successfulOperations of $totalOperations operations completed."
     }
 
-    Write-Host "`n$finalMessage" -ForegroundColor $(if ($successfulOperations -eq $totalOperations -and $totalOperations -gt 0) { 'Green' } elseif ($totalOperations -eq 0) { 'Yellow' } else { 'Yellow' })
+    Write-StatusMessage -Message $finalMessage
 
     # GUI notification
     $guiMessage = if ($totalOperations -eq 0) {
         "No processes were found to configure.`n`nPlease ensure audio services and Voicemeeter are available."
     }
     elseif ($successfulOperations -eq $totalOperations) {
-        "All audio optimizations applied successfully! :)`n`nAudiodg and Voicemeeter are configured for optimal performance."
+        "All audio optimizations applied successfully.`n`nAudiodg and Voicemeeter are configured for optimal performance."
     }
     else {
         "Audio optimization partially completed.`n`n$successfulOperations of $totalOperations operations succeeded.`n`nSome settings may be blocked by Windows process protection."
@@ -534,10 +569,7 @@ function Main {
     [CmdletBinding()]
     param()
 
-    Write-Host "`n╔════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║   Audio Process Optimizer for          ║" -ForegroundColor Cyan
-    Write-Host "║   Voicemeeter & Audiodg                ║" -ForegroundColor Cyan
-    Write-Host "╚════════════════════════════════════════╝`n" -ForegroundColor Cyan
+    Write-StatusMessage -Message "Audio Process Optimizer for Voicemeeter and Audiodg"
 
     # Check administrator privileges
     if (-not (Test-IsAdministrator)) {
@@ -545,7 +577,7 @@ function Main {
         return
     }
 
-    Write-Host "✓ Running with administrator privileges`n" -ForegroundColor Green
+    Write-StatusMessage -Message "Running with administrator privileges"
 
     # Process audiodg.exe
     Optimize-AudiodgProcess
@@ -557,7 +589,7 @@ function Main {
     # Show final summary
     Show-FinalSummary
 
-    Write-Host "`n✓ Script execution complete" -ForegroundColor Green
+    Write-StatusMessage -Message "Script execution complete"
 }
 
 # Execute main function with error handling
@@ -566,8 +598,8 @@ try {
 }
 catch {
     Write-Error "Unexpected error occurred: $($_.Exception.Message)"
-    Write-Host "`nStack Trace:" -ForegroundColor Red
-    Write-Host $_.ScriptStackTrace -ForegroundColor Red
+    Write-Verbose "Stack Trace:"
+    Write-Verbose $_.ScriptStackTrace
     
     Show-Notification -Message "An unexpected error occurred:`n`n$($_.Exception.Message)" -Type Error
     

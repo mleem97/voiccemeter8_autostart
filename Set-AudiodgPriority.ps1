@@ -26,9 +26,13 @@
     .\Set-AudiodgPriority.ps1
     Runs the script with automatic elevation if needed.
 
+.EXAMPLE
+    .\Set-AudiodgPriority.ps1 -WhatIf
+    Shows which process changes would be attempted without applying them.
+
 #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess = $true)]
 param()
 
 # ---------------------------------------------
@@ -41,6 +45,23 @@ $Script:Config = @{
     CountdownSeconds   = 10
     MaxRetryAttempts   = 3
     RetryDelaySeconds  = 2
+}
+
+# ---------------------------------------------
+# Function: Write-StatusMessage
+# ---------------------------------------------
+function Write-StatusMessage {
+    <#
+    .SYNOPSIS
+        Writes status text to the verbose stream.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    Write-Verbose -Message $Message
 }
 
 # ---------------------------------------------
@@ -74,11 +95,11 @@ function Start-ElevatedProcess {
     .SYNOPSIS
         Restarts the current script with elevated privileges.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
     param()
 
     try {
-        Write-Host "Administrator privileges required. Restarting with elevation..." -ForegroundColor Yellow
+        Write-StatusMessage -Message "Administrator privileges required. Restarting with elevation..."
         
         $pwshPath = if (Test-Path "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe") {
             "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
@@ -86,14 +107,21 @@ function Start-ElevatedProcess {
             "powershell.exe"
         }
 
+        $scriptPath = $MyInvocation.PSCommandPath
+        if (-not $scriptPath) {
+            $scriptPath = $PSCommandPath
+        }
+
         $arguments = @(
             '-NoProfile'
             '-ExecutionPolicy', 'Bypass'
-            '-File', "`"$($MyInvocation.PSCommandPath)`""
+            '-File', "`"$scriptPath`""
         )
 
-        Start-Process -FilePath $pwshPath -ArgumentList $arguments -Verb RunAs
-        exit 0
+        if ($PSCmdlet.ShouldProcess($scriptPath, 'Restart script with administrator privileges')) {
+            Start-Process -FilePath $pwshPath -ArgumentList $arguments -Verb RunAs -ErrorAction Stop
+            exit 0
+        }
     }
     catch {
         Write-Error "Failed to elevate privileges: $($_.Exception.Message)"
@@ -188,7 +216,7 @@ function Set-ProcessPriority {
     .SYNOPSIS
         Sets the priority class for a given process.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
         [Parameter(Mandatory = $true)]
         [System.Diagnostics.Process]$Process,
@@ -199,8 +227,13 @@ function Set-ProcessPriority {
 
     try {
         Write-Verbose "Setting process priority to '$Priority'"
+
+        if (-not $PSCmdlet.ShouldProcess($Process.ProcessName, "Set process priority to '$Priority'")) {
+            return $false
+        }
+
         $Process.PriorityClass = $Priority
-        Write-Host "✓ Process priority set to '$Priority'" -ForegroundColor Green
+        Write-StatusMessage -Message "Process priority set to '$Priority'"
         return $true
     }
     catch [System.ComponentModel.Win32Exception] {
@@ -221,7 +254,7 @@ function Set-ProcessorAffinity {
     .SYNOPSIS
         Sets the processor affinity for a given process.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'Medium')]
     param(
         [Parameter(Mandatory = $true)]
         [System.Diagnostics.Process]$Process,
@@ -232,8 +265,13 @@ function Set-ProcessorAffinity {
 
     try {
         Write-Verbose "Setting processor affinity to $Affinity (CPU Core 0)"
+
+        if (-not $PSCmdlet.ShouldProcess($Process.ProcessName, "Set processor affinity to '$Affinity'")) {
+            return $false
+        }
+
         $Process.ProcessorAffinity = $Affinity
-        Write-Host "✓ Processor affinity set to CPU Core 0" -ForegroundColor Green
+        Write-StatusMessage -Message "Processor affinity set to CPU Core 0"
         return $true
     }
     catch [System.ComponentModel.Win32Exception] {
@@ -253,8 +291,8 @@ function Main {
     [CmdletBinding()]
     param()
 
-    Write-Host "`n=== Audio Process Optimizer ===" -ForegroundColor Cyan
-    Write-Host "Configuring audiodg.exe process settings`n" -ForegroundColor Cyan
+    Write-StatusMessage -Message "Audio Process Optimizer"
+    Write-StatusMessage -Message "Configuring audiodg.exe process settings"
 
     # Check administrator privileges
     if (-not (Test-IsAdministrator)) {
@@ -262,20 +300,20 @@ function Main {
         return
     }
 
-    Write-Host "✓ Running with administrator privileges`n" -ForegroundColor Green
+    Write-StatusMessage -Message "Running with administrator privileges"
 
     # Retrieve audiodg.exe process
-    Write-Host "Searching for audiodg.exe process..." -ForegroundColor Yellow
+    Write-StatusMessage -Message "Searching for audiodg.exe process..."
     $audioProcess = Get-AudiodgProcess -MaxRetries $Script:Config.MaxRetryAttempts -RetryDelaySeconds $Script:Config.RetryDelaySeconds
 
     if (-not $audioProcess) {
         Write-Warning "audiodg.exe process not found after $($Script:Config.MaxRetryAttempts) attempts."
-        Write-Host "`nThe process may not be running. Please ensure audio services are active." -ForegroundColor Yellow
+        Write-StatusMessage -Message "The process may not be running. Please ensure audio services are active."
         Show-ProgressCountdown -Seconds 5 -Activity 'Cleanup' -Status 'Exiting'
         exit 1
     }
 
-    Write-Host "✓ Found audiodg.exe (PID: $($audioProcess.Id))`n" -ForegroundColor Green
+    Write-StatusMessage -Message "Found audiodg.exe (PID: $($audioProcess.Id))"
 
     # Apply settings
     $successCount = 0
@@ -289,18 +327,17 @@ function Main {
     }
 
     # Summary
-    Write-Host "`n--- Summary ---" -ForegroundColor Cyan
-    Write-Host "Successfully applied: $successCount of 2 settings" -ForegroundColor $(if ($successCount -eq 2) { 'Green' } else { 'Yellow' })
+    Write-StatusMessage -Message "Summary"
+    Write-StatusMessage -Message "Successfully applied: $successCount of 2 settings"
     
     if ($successCount -lt 2) {
-        Write-Host "`nNote: Some settings could not be applied due to Windows process protection." -ForegroundColor Yellow
-        Write-Host "This is normal for audiodg.exe on modern Windows versions." -ForegroundColor Yellow
+        Write-Warning "Some settings could not be applied due to Windows process protection. This is normal for audiodg.exe on modern Windows versions."
     }
 
     # Countdown
     Show-ProgressCountdown -Seconds $Script:Config.CountdownSeconds -Activity 'All Settings Applied' -Status 'Completing'
 
-    Write-Host "`n✓ Script completed successfully" -ForegroundColor Green
+    Write-StatusMessage -Message "Script completed successfully"
     exit 0
 }
 
@@ -310,7 +347,7 @@ try {
 }
 catch {
     Write-Error "Unexpected error occurred: $($_.Exception.Message)"
-    Write-Host "`nStack Trace:" -ForegroundColor Red
-    Write-Host $_.ScriptStackTrace -ForegroundColor Red
+    Write-Verbose "Stack Trace:"
+    Write-Verbose $_.ScriptStackTrace
     exit 1
 }
