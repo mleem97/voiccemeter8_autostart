@@ -6,7 +6,7 @@
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## 🎯 Overview
+## Overview
 
 This PowerShell script optimizes audio performance on Windows by automatically:
 - **Starting Voicemeeter** if not already running
@@ -18,22 +18,22 @@ This PowerShell script optimizes audio performance on Windows by automatically:
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
-- [Features](#-features)
-- [System Requirements](#-system-requirements)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [Configuration](#-configuration)
-- [Important Notes](#-important-notes)
-- [Troubleshooting](#-troubleshooting)
-- [Advanced Options](#-advanced-options)
-- [Contributing](#-contributing)
-- [License](#-license)
+- [Features](#features)
+- [System Requirements](#system-requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Important Notes](#important-notes)
+- [Troubleshooting](#troubleshooting)
+- [Advanced Options](#advanced-options)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## ✨ Features
+## Features
 
 ✅ **Dual Process Management**
 - Automatically detects and configures Voicemeeter
@@ -47,7 +47,7 @@ This PowerShell script optimizes audio performance on Windows by automatically:
 
 ✅ **Visual Feedback**
 - GUI message boxes for status notifications
-- Color-coded console output for clear feedback
+- Verbose console output for diagnostics
 - Detailed operation summary with success/failure indicators
 
 ✅ **Robust Error Handling**
@@ -59,9 +59,13 @@ This PowerShell script optimizes audio performance on Windows by automatically:
 - Automatic elevation to admin rights if needed
 - One-click re-execution without manual UAC prompts
 
+✅ **PowerShell Safety Support**
+- Supports `-WhatIf` and `-Confirm` for process-changing operations
+- Avoids writing status messages to the success output stream
+
 ---
 
-## 📦 System Requirements
+## System Requirements
 
 - **Operating System:** Windows 10 or Windows 11
 - **PowerShell:** Version 3.0 or higher (built-in on all supported Windows versions)
@@ -71,7 +75,7 @@ This PowerShell script optimizes audio performance on Windows by automatically:
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Option 1: Quick Setup (Recommended)
 
@@ -118,7 +122,7 @@ This PowerShell script optimizes audio performance on Windows by automatically:
 
 ---
 
-## 💻 Usage
+## Usage
 
 ### Basic Execution
 
@@ -143,6 +147,13 @@ For detailed troubleshooting information:
 .\Start-VoicemeeterOptimized.ps1 -Verbose
 ```
 
+### Preview Changes
+
+To see which process changes would be attempted without applying them:
+```powershell
+.\Start-VoicemeeterOptimized.ps1 -WhatIf
+```
+
 ### Via Command Line
 
 Direct execution without opening PowerShell ISE:
@@ -152,7 +163,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Scripts\Start-Voicem
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 All settings are centralized in the `$Script:Config` hashtable at the top of the script. Modify these values to customize behavior:
 
@@ -201,7 +212,7 @@ TargetAffinity = [System.IntPtr]8
 
 ---
 
-## ⚠️ Important Notes
+## Important Notes
 
 ### Protected Process Light (PPL)
 Audiodg.exe runs as a **Protected Process Light** on modern Windows versions. This means:
@@ -227,7 +238,7 @@ Audiodg.exe runs as a **Protected Process Light** on modern Windows versions. Th
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### PowerShell Execution Policy Error
 
@@ -296,7 +307,7 @@ Test-Path "C:\Program Files (x86)\VB\Voicemeeter\voicemeeter8x64.exe"
 
 ---
 
-## 🎯 Advanced Options
+## Advanced Options
 
 ### Create a Desktop Shortcut
 
@@ -339,7 +350,7 @@ Start-VoicemeeterApplication
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Here's how to help:
 
@@ -361,7 +372,7 @@ We welcome contributions! Here's how to help:
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
@@ -373,13 +384,13 @@ The above copyright notice and this permission notice shall be included in all c
 
 ---
 
-## 📞 Support
+## Support
 
 - **Issues:** Open an issue on GitHub
 
 ---
 
-## 🔗 Related Resources
+## Related Resources
 
 - [Voicemeeter Official](https://vb-audio.com/Voicemeeter/)
 - [Windows Process Priority](https://docs.microsoft.com/en-us/windows/win32/procthread/process-priority-class)
