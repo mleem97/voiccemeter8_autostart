@@ -1,10 +1,12 @@
 # Audio Optimizer for Voicemeeter & Audiodg
 
 > Automatically optimize audio processing performance by setting process priority and CPU affinity for Voicemeeter and Windows Audiodg service.
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/ba709f07efc24927871a84d4527ad1e8)](https://app.codacy.com/gh/mleem97/AudioAffinityOptimizer/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+
+
 ![PowerShell Version](https://img.shields.io/badge/PowerShell-3.0+-blue)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4)
 ![License](https://img.shields.io/badge/License-MIT-green)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/ba709f07efc24927871a84d4527ad1e8)](https://app.codacy.com/gh/mleem97/AudioAffinityOptimizer/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 ## Overview
 
